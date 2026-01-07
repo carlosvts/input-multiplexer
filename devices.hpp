@@ -2,8 +2,10 @@
 #define MOUSE_H
 
 #include <cerrno>
-#include <cstdlib>
+#include <string>
+#include <sstream>
 #include <vector>
+#include <fstream> 
 #include <iostream>
 #include <linux/input-event-codes.h>
 #include <sys/epoll.h> // for epoll 
@@ -12,11 +14,36 @@
 #include <unistd.h> // for close
 #include <linux/input.h> // for struct input_event, event codes
  
-constexpr const char* KEYBOARD_DEVICE_PATH = "/dev/input/event11";
-constexpr const char* MOUSE_DEVICE_PATH = "/dev/input/event10";
 constexpr const int MAX_EVENTS = 15;
 
+std::string findPathByFile(const std::string& target)
+{
+    std::ifstream file("/proc/bus/input/devices");
+    std::string line, path; 
+    bool finded = false;
 
+    while (std::getline(file, line))
+    {
+        if (line.find("N: Name=") != std::string::npos && line.find(target) != std::string::npos)
+        { finded = true; }
+
+        if (finded && line.find("H: Handlers= ") != std::string::npos)
+        {
+            std::stringstream ss(line);
+            std::string word;
+            while (ss >> word)
+            {
+                if (word.find("event") != std::string::npos)
+                {   
+                    std::string basePath = "/dev/input/";
+                    return basePath + word; 
+                }
+            }
+        }
+        if (line.empty()) { finded = false; }
+    }
+    return "";
+}
 
 class InputDevice
 {
@@ -40,13 +67,14 @@ class InputDevice
 
 struct Keyboard : public InputDevice
 {
-    Keyboard(const char* keyboardDevicePath = KEYBOARD_DEVICE_PATH)
+    Keyboard(const char* keyboardDevicePath)
     {
         m_keyboardListener = open(keyboardDevicePath, O_RDONLY, 0);
         m_fd = m_keyboardListener;
         if (m_keyboardListener < 0)
         {
             std::cerr << "Unable to instantiate keyboard file descriptor: " << errno << '\n';
+            exit(1);
         }
     }
 
@@ -57,6 +85,7 @@ struct Keyboard : public InputDevice
         if (keyboardBytesRead < 0)
         {
             std::cerr << "Error while fetching keyboard data: " << errno << '\n';
+            exit(1);
         }
         std::cout << "Event type: " << m_inputEvent.type << std::endl;
         std::cout << "Code: " << m_inputEvent.code << std::endl;
@@ -70,13 +99,14 @@ struct Keyboard : public InputDevice
 
 struct Mouse : public InputDevice 
 {
-    Mouse(const char* mouseDevicePath = MOUSE_DEVICE_PATH)
+    Mouse(const char* mouseDevicePath)
     {
         m_mouseListener = open(mouseDevicePath, O_RDONLY, 0);
         m_fd = m_mouseListener;
         if (m_mouseListener < 0)
         {
            std::cerr << "Unable to instantiate mouse file descriptor: " << errno << '\n';
+           exit(1);
         }
     }
 
@@ -86,6 +116,7 @@ struct Mouse : public InputDevice
         if (mouseBytesRead < 0)
         {
             std::cerr << "Error while fetching mouse data: " << errno << '\n';
+            exit(1);
         }
 
         if (m_inputEvent.type == EV_REL)
@@ -99,6 +130,7 @@ struct Mouse : public InputDevice
                 m_mouse_y += m_inputEvent.value;
             }
             std::cout << "[MOUSE POS (X, Y)]" << '(' << m_mouse_x << ", " << m_mouse_y << ")\n";
+            exit(1);
         }
 
     }
@@ -120,6 +152,7 @@ class Listener
             if (m_epoll < 0)
             {
                 std::cerr << "error while creating epoll: " << errno << '\n';
+                exit(1);
             }
         }
 
@@ -144,6 +177,7 @@ class Listener
             if (m_epollController < 0)
             {
                 std::cerr << "Error in epoll controller: " << errno << '\n';
+                exit(1);
             }
         }
 
@@ -155,6 +189,7 @@ class Listener
                 if (epollCheck < 0)
                 {
                     std::cerr << "epoll wait error: " << errno << '\n';
+                    exit(1);
                 }
                 for(int i {}; i < epollCheck; ++i)
                 {
