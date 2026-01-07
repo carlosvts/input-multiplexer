@@ -16,6 +16,7 @@
  
 constexpr const int MAX_EVENTS = 15;
 
+
 class InputDevice
 {
     public:
@@ -35,6 +36,7 @@ class InputDevice
         int m_fd = -1;
         const char* path; 
 };
+
 
 struct Keyboard : public InputDevice
 {
@@ -88,7 +90,6 @@ struct Keyboard : public InputDevice
                 case KEY_TAB:       std::cout << "[KBD] TAB " << state << std::endl; break;
 
                 default:
-                    // Caso queira ver o código de teclas não mapeadas
                     if (m_inputEvent.value == 1) 
                     {
                         std::cout << "[KBD] Key " << m_inputEvent.code << " " << state << std::endl;
@@ -98,12 +99,11 @@ struct Keyboard : public InputDevice
         }
     }
 
-
-
     private:
         int m_keyboardListener {}; 
         struct input_event m_inputEvent {};
 };
+
 
 struct Mouse : public InputDevice 
 {
